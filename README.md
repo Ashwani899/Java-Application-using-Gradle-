@@ -45,25 +45,22 @@ The simulated dependency deliberately produces intermittent failures so the circ
 
 ## Current repository layout
 
-The current repository contains `OrbitApp.java`, `OrbitAppTest.java`, `build.gradle`, `settings.gradle`, `Dockerfile`, and a pipeline definition at the repository root.
+The Java application and test now use Gradle's standard source layout. The repository uses the Gradle 8.10.2 toolchain in CI and Java 21 for compilation and runtime.
 
-There are a few setup gaps to resolve before a clean clone is fully reproducible:
+The CI workflow builds the application, runs deterministic unit tests, generates JaCoCo coverage output, and packages the executable Shadow JAR. A Gradle Wrapper is not currently checked in, so local builds require a compatible Gradle installation:
 
-1. Gradle's default Java source layout is `src/main/java` and `src/test/java`, but the Java files are currently at the repository root.
-2. A Gradle Wrapper (`gradlew`, `gradlew.bat`, and `gradle/wrapper/`) is not currently checked in.
-3. The pipeline YAML is named `pipeline.yml` at the root; GitHub Actions will not discover it there. A GitHub Actions workflow belongs under `.github/workflows/`.
-4. The current test contains a placeholder `assertTrue(true)`; it does not yet verify endpoint behavior, circuit-breaker transitions, or metrics output.
+```bash
+gradle clean test jacocoTestReport shadowJar
+```
 
-These items are documented so that the build status is not overstated.
+The circuit-breaker test verifies that four consecutive failures open the configured four-call window and that subsequent calls are rejected while open. The external dependency remains simulated; the project does not connect to a live telemetry service or claim production reliability.
 
 ## Next engineering steps
 
-- Move the application and test classes into Gradle's conventional source directories, or explicitly configure source sets.
-- Add a Gradle Wrapper and pin the wrapper distribution.
-- Move and validate the CI workflow under `.github/workflows/`.
-- Replace the placeholder test with endpoint and resilience behavior tests.
-- Add a deterministic injectable external-service stub instead of relying on random failures in tests.
-- Add a `docker build` smoke test and document the runtime configuration.
+- Add an injectable HTTP client and endpoint-level tests using a deterministic stub server.
+- Add container image build and runtime health checks to CI.
+- Add a Gradle Wrapper after generating and verifying it with the selected Gradle distribution.
+- Add deterministic metrics assertions for request counts and circuit-breaker state.
 
 ## Run (after the source layout and build setup are corrected)
 
