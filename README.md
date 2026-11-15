@@ -1,77 +1,82 @@
 # Orbit Telemetry
 
-A Java service prototype exploring basic service observability and resilience patterns. The application exposes a health endpoint, a Prometheus metrics endpoint, and a sample API route protected by a Resilience4j circuit breaker around a simulated external dependency.
+A Java service prototype exploring HTTP health reporting, Prometheus-format metrics, and resilience around a simulated external dependency.
 
-> **Project status:** Learning prototype. The external service is simulated, the current test is only a placeholder assertion, and the repository still needs build-layout and CI wiring before it should be described as production-ready.
+> **Project status:** Learning prototype. The dependency is simulated; this is not a live telemetry collector or a production reliability service.
 
-## What is implemented in the current source
+## Implemented endpoints
 
-- **HTTP service:** Javalin application listening on port `8080`.
-- **Health check:** `GET /health`.
-- **Metrics endpoint:** `GET /metrics`, backed by Micrometer's Prometheus registry.
-- **Resilience example:** `GET /api/data` calls a simulated external operation through a Resilience4j circuit breaker.
-- **Container image:** Java 21 runtime image with a non-root application user and a bounded heap setting.
-- **Build configuration:** Gradle Java/application plugins, Shadow packaging, JaCoCo reporting, and JUnit 5 dependencies are declared.
+| Endpoint | Behavior |
+|---|---|
+| `GET /health` | Returns a JSON `UP` status |
+| `GET /metrics` | Exposes the Micrometer Prometheus registry scrape |
+| `GET /api/data` | Runs a simulated dependency call through a Resilience4j circuit breaker |
 
-## Architecture
+The simulated call returns demonstration telemetry for a deterministic test sample and throws for a failure sample. The HTTP route uses a random sample, so its response varies.
 
-```text
-HTTP client
-    |
-    v
-Javalin service (:8080)
-    |             |                 |
- /health       /metrics         /api/data
-                                  |
-                           Circuit breaker
-                                  |
-                         Simulated dependency
-```
+## Resilience configuration
 
-The simulated dependency deliberately produces intermittent failures so the circuit-breaker path can be explored without relying on a real third-party service. The returned payload is demonstration data, not a live telemetry feed.
+The circuit breaker uses:
 
-## Technology stack
+- a 50% failure-rate threshold;
+- a four-call count-based sliding window;
+- a minimum of four calls before calculating the failure rate; and
+- a ten-second open-state wait duration.
+
+The minimum-call setting is explicit so the four-call example window can actually evaluate its failure rate.
+
+## Technology
 
 | Area | Technology |
 |---|---|
 | Language/runtime | Java 21 |
 | HTTP | Javalin |
 | Resilience | Resilience4j CircuitBreaker |
-| Metrics | Micrometer + Prometheus registry |
+| Metrics | Micrometer and Prometheus registry |
 | Logging | SLF4J |
-| Build | Gradle |
-| Testing | JUnit 5 / JaCoCo |
-| Container | Docker, Eclipse Temurin JRE |
+| Build | Gradle 8.10.2 in CI |
+| Tests | JUnit 5 and JaCoCo |
+| Container definition | Dockerfile (not currently built by CI) |
 
-## Current repository layout
+## Repository layout
 
-The Java application and test now use Gradle's standard source layout. The repository uses the Gradle 8.10.2 toolchain in CI and Java 21 for compilation and runtime.
+The application and test use Gradle's standard source layout:
 
-The CI workflow builds the application, runs deterministic unit tests, generates JaCoCo coverage output, and packages the executable Shadow JAR. A Gradle Wrapper is not currently checked in, so local builds require a compatible Gradle installation:
+```text
+src/main/java/com/orbit/telemetry/OrbitApp.java
+src/test/java/com/orbit/telemetry/OrbitAppTest.java
+build.gradle
+settings.gradle
+Dockerfile
+.github/workflows/ci.yml
+```
+
+A Gradle Wrapper is not checked in. Install a compatible Gradle version locally, then run:
 
 ```bash
 gradle clean test jacocoTestReport shadowJar
 ```
 
-The circuit-breaker test verifies that four consecutive failures open the configured four-call window and that subsequent calls are rejected while open. The external dependency remains simulated; the project does not connect to a live telemetry service or claim production reliability.
+The build produces `build/libs/orbit-telemetry.jar`.
 
-## Next engineering steps
+## Tests and continuous integration
 
-- Add an injectable HTTP client and endpoint-level tests using a deterministic stub server.
-- Add container image build and runtime health checks to CI.
+The unit tests verify the deterministic simulated success/failure paths and that four consecutive failures open the circuit breaker and reject a subsequent call.
+
+GitHub Actions uses Java 21 and Gradle 8.10.2 to run the tests, generate a JaCoCo report, build the Shadow JAR, and upload the JAR as a workflow artifact. The workflow does not currently build or smoke-test the Docker image, nor does it test the HTTP endpoints with an embedded server.
+
+Check the latest [Actions runs](https://github.com/Ashwani899/Java-Application-using-Gradle-/actions) for current results.
+
+## Limitations and next steps
+
+- Replace the random simulated dependency with an injectable HTTP client and deterministic stub server.
+- Add endpoint-level tests for health, metrics, API response codes, and circuit-breaker transitions.
+- Add Docker build and runtime health checks to CI.
 - Add a Gradle Wrapper after generating and verifying it with the selected Gradle distribution.
-- Add deterministic metrics assertions for request counts and circuit-breaker state.
+- Add explicit metrics for request counts and circuit-breaker state.
 
-## Run (after the source layout and build setup are corrected)
-
-With a compatible Gradle installation and dependencies available:
-
-```bash
-gradle clean build
-```
-
-The intended packaged artifact name is `orbit-telemetry.jar`. The current checked-in layout has the gaps listed above, so successful packaging should be verified rather than assumed.
+The service does not connect to a live telemetry source and does not claim production reliability.
 
 ## License
 
-See the repository for license information.
+No license file is currently included. Do not assume reuse or redistribution rights until a license is explicitly added.
