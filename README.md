@@ -79,4 +79,4 @@ The service does not connect to a live telemetry source and does not claim produ
 
 ## License
 
-See the repository license file.
+No license file is currently included. Do not assume reuse or redistribution rights until a license is explicitly added.
